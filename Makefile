@@ -18,7 +18,7 @@ COMPOSE      := docker compose
 # ----------------------------------------------------------------------------
 # Alvos seguidos de '##' aparecem listados no `make help`
 # ----------------------------------------------------------------------------
-.PHONY: help install run build up down logs ps shell clean
+.PHONY: help install run build up down logs ps shell clean test
 
 help: ## Lista todos os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -46,6 +46,9 @@ ps: ## Lista o status dos serviços Docker
 
 shell: ## Abre um shell dentro do container do backend
 	$(COMPOSE) exec backend sh
+
+test: ## Executa a suíte de testes com Pytest
+	cd $(BACKEND) && $(POETRY) run pytest -v
 
 clean: ## Remove containers, volumes e artefatos locais
 	$(COMPOSE) down -v
