@@ -1,0 +1,40 @@
+# ============================================================================
+# Docker Compose do projeto C216
+# Serviços: backend (FastAPI) e banco de dados (PostgreSQL)
+# ============================================================================
+
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: c216-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://c216:c216@db:5432/c216
+      APP_ENV: development
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: c216-db
+    environment:
+      POSTGRES_USER: c216
+      POSTGRES_PASSWORD: c216
+      POSTGRES_DB: c216
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U c216 -d c216"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:

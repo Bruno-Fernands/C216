@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Poetry / virtualenv
+.venv/
+poetry.toml
+
+# Testes e cobertura (só interessam em dev/CI)
+tests/
+.pytest_cache/
+.coverage
+
+# Ambiente
+.env
+
+# Git
+.git/
+.gitignore
