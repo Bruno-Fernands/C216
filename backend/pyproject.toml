@@ -1,0 +1,20 @@
+[project]
+name = "c216-backend"
+version = "0.1.0"
+description = "Backend da disciplina C216 - Sistemas Distribuídos (L1)"
+authors = [
+    {name = "Bruno Fernandes",email = "111819744+Bruno-Fernands@users.noreply.github.com"}
+]
+license = "MIT"
+requires-python = "^3.12"
+dependencies = [
+    "fastapi (>=0.141.1,<0.142.0)",
+    "uvicorn[standard] (>=0.53.0,<0.54.0)",
+    "pydantic (>=2.13.5,<3.0.0)",
+    "python-dotenv (>=1.2.3,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
