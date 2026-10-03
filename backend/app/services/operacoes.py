@@ -1,7 +1,7 @@
 """Funções de negócio reutilizáveis pelo backend.
 
 Mantidas fora da camada HTTP para facilitar a escrita de testes
-unitários (previsto para a Prática 3).
+unitários.
 """
 
 
