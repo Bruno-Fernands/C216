@@ -1,0 +1,50 @@
+# ============================================================================
+# CI - Backend C216
+# Roda os testes do backend (Pytest) e valida o build da imagem Docker.
+# Executa em `push` e `pull_request`, conforme o requisito da Prática 3.
+# ============================================================================
+
+name: CI - Backend
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    name: Testes (Pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Setup do Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar e configurar o Poetry
+        run: |
+          pip install poetry==2.4.3
+          poetry config virtualenvs.in-project true
+
+      - name: Instalar dependências com Poetry
+        run: poetry install
+
+      - name: Executar os testes com Pytest
+        run: poetry run pytest -v
+
+  build-image:
+    name: Build da imagem Docker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Build da imagem do backend
+        run: docker compose build backend
