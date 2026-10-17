@@ -1,15 +1,6 @@
-"""Testes de integração da API (FastAPI) usando o TestClient."""
+"""Testes de integração dos endpoints de operações usando o TestClient."""
 
-import pytest
 from fastapi.testclient import TestClient
-
-from app.main import app
-
-
-@pytest.fixture
-def client() -> TestClient:
-    """Fixture que retorna um cliente de teste da aplicação."""
-    return TestClient(app)
 
 
 def test_raiz_ok(client: TestClient) -> None:
@@ -31,6 +22,12 @@ def test_somar_endpoint(client: TestClient) -> None:
     resposta = client.get("/somar", params={"a": 2, "b": 3})
     assert resposta.status_code == 200
     assert resposta.json() == {"resultado": 5}
+
+
+def test_somar_sem_parametros_retorna_422(client: TestClient) -> None:
+    """Query parameters obrigatórios ausentes devem retornar HTTP 422."""
+    resposta = client.get("/somar")
+    assert resposta.status_code == 422
 
 
 def test_dividir_endpoint(client: TestClient) -> None:
