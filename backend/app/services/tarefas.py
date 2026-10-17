@@ -1,9 +1,17 @@
 """Regras de negócio do recurso ``tarefas``.
 
-Os dados ficam em memória (dicionário), o que mantém o recurso simples
-e sem dependência de banco de dados nos testes.
+O serviço não acessa o banco diretamente: delega a persistência ao
+``TarefaRepository`` e devolve schemas Pydantic, nunca modelos ORM.
 """
 
+from typing import Annotated
+
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.models.tarefa import TarefaModel
+from app.repositories.tarefa_repository import TarefaRepository
 from app.schemas.tarefa import Tarefa, TarefaAtualizacaoParcial, TarefaEntrada
 
 
@@ -16,56 +24,50 @@ class TarefaNaoEncontradaError(Exception):
 
 
 class TarefaService:
-    """CRUD de tarefas armazenadas em memória."""
+    """CRUD de tarefas sobre um ``TarefaRepository``."""
 
-    def __init__(self) -> None:
-        self._tarefas: dict[int, Tarefa] = {}
-        self._proximo_id = 1
+    def __init__(self, repositorio: TarefaRepository) -> None:
+        self.repositorio = repositorio
+
+    def _buscar(self, tarefa_id: int) -> TarefaModel:
+        tarefa = self.repositorio.obter(tarefa_id)
+        if tarefa is None:
+            raise TarefaNaoEncontradaError(tarefa_id)
+        return tarefa
 
     def listar(self, concluida: bool | None = None, limite: int = 100) -> list[Tarefa]:
         """Lista as tarefas, opcionalmente filtrando por ``concluida``."""
-        tarefas = list(self._tarefas.values())
-        if concluida is not None:
-            tarefas = [t for t in tarefas if t.concluida == concluida]
-        return tarefas[:limite]
+        tarefas = self.repositorio.listar(concluida=concluida, limite=limite)
+        return [Tarefa.model_validate(t) for t in tarefas]
 
     def obter(self, tarefa_id: int) -> Tarefa:
         """Retorna a tarefa ou levanta ``TarefaNaoEncontradaError``."""
-        try:
-            return self._tarefas[tarefa_id]
-        except KeyError as exc:
-            raise TarefaNaoEncontradaError(tarefa_id) from exc
+        return Tarefa.model_validate(self._buscar(tarefa_id))
 
     def criar(self, dados: TarefaEntrada) -> Tarefa:
-        """Cria uma tarefa com o próximo id disponível."""
-        tarefa = Tarefa(id=self._proximo_id, **dados.model_dump())
-        self._tarefas[tarefa.id] = tarefa
-        self._proximo_id += 1
-        return tarefa
+        """Cria uma tarefa."""
+        return Tarefa.model_validate(self.repositorio.criar(dados.model_dump()))
 
     def substituir(self, tarefa_id: int, dados: TarefaEntrada) -> Tarefa:
-        """Substitui todos os campos da tarefa (semântica do PUT)."""
-        self.obter(tarefa_id)
-        tarefa = Tarefa(id=tarefa_id, **dados.model_dump())
-        self._tarefas[tarefa_id] = tarefa
-        return tarefa
+        """Substitui todos os campos editáveis da tarefa (semântica do PUT)."""
+        tarefa = self._buscar(tarefa_id)
+        return Tarefa.model_validate(
+            self.repositorio.atualizar(tarefa, dados.model_dump())
+        )
 
     def atualizar(self, tarefa_id: int, dados: TarefaAtualizacaoParcial) -> Tarefa:
         """Atualiza apenas os campos enviados (semântica do PATCH)."""
-        atual = self.obter(tarefa_id)
-        tarefa = atual.model_copy(update=dados.model_dump(exclude_unset=True))
-        self._tarefas[tarefa_id] = tarefa
-        return tarefa
+        tarefa = self._buscar(tarefa_id)
+        campos = dados.model_dump(exclude_unset=True)
+        return Tarefa.model_validate(self.repositorio.atualizar(tarefa, campos))
 
     def remover(self, tarefa_id: int) -> None:
         """Remove a tarefa ou levanta ``TarefaNaoEncontradaError``."""
-        self.obter(tarefa_id)
-        del self._tarefas[tarefa_id]
+        self.repositorio.remover(self._buscar(tarefa_id))
 
 
-_servico = TarefaService()
-
-
-def get_tarefa_service() -> TarefaService:
-    """Dependência do FastAPI: instância única usada pela aplicação."""
-    return _servico
+def get_tarefa_service(
+    session: Annotated[Session, Depends(get_db)],
+) -> TarefaService:
+    """Dependência do FastAPI: serviço ligado à sessão da requisição."""
+    return TarefaService(TarefaRepository(session))

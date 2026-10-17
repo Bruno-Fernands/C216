@@ -18,7 +18,7 @@ COMPOSE      := docker compose
 # ----------------------------------------------------------------------------
 # Alvos seguidos de '##' aparecem listados no `make help`
 # ----------------------------------------------------------------------------
-.PHONY: help install run build up down logs ps shell clean test test-unit test-integration
+.PHONY: help install run build up down logs ps shell clean db test test-unit test-integration lint format migrate migration
 
 help: ## Lista todos os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -32,8 +32,11 @@ run: ## Sobe o servidor FastAPI localmente (sem Docker)
 build: ## Constrói as imagens Docker do projeto
 	$(COMPOSE) build
 
-up: ## Sobe os serviços (backend + banco) em segundo plano
-	$(COMPOSE) up -d
+up: ## Sobe os serviços (backend + banco) e espera ficarem saudáveis
+	$(COMPOSE) up -d --wait
+
+db: ## Sobe apenas o PostgreSQL (usado pelos testes de integração)
+	$(COMPOSE) up -d --wait db
 
 down: ## Derruba os serviços Docker
 	$(COMPOSE) down
@@ -47,14 +50,26 @@ ps: ## Lista o status dos serviços Docker
 shell: ## Abre um shell dentro do container do backend
 	$(COMPOSE) exec backend sh
 
-test: ## Executa a suíte de testes completa com Pytest
+test: db ## Executa a suíte de testes completa (sobe o PostgreSQL)
 	cd $(BACKEND) && $(POETRY) run pytest -v
 
-test-unit: ## Executa apenas os testes unitários
+test-unit: ## Executa apenas os testes unitários (não precisa de banco)
 	cd $(BACKEND) && $(POETRY) run pytest tests/unit -v
 
-test-integration: ## Executa apenas os testes de integração
+test-integration: db ## Executa apenas os testes de integração (sobe o PostgreSQL)
 	cd $(BACKEND) && $(POETRY) run pytest tests/integration -v
+
+lint: ## Verifica estilo e formatação do código com o Ruff
+	cd $(BACKEND) && $(POETRY) run ruff check . && $(POETRY) run ruff format --check .
+
+format: ## Corrige o estilo e formata o código com o Ruff
+	cd $(BACKEND) && $(POETRY) run ruff check --fix . && $(POETRY) run ruff format .
+
+migrate: db ## Aplica as migrations pendentes no banco (Alembic)
+	cd $(BACKEND) && $(POETRY) run alembic upgrade head
+
+migration: db ## Gera uma migration a partir dos modelos: make migration msg="descricao"
+	cd $(BACKEND) && $(POETRY) run alembic revision --autogenerate -m "$(msg)"
 
 clean: ## Remove containers, volumes e artefatos locais
 	$(COMPOSE) down -v

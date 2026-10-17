@@ -1,34 +1,78 @@
-"""Testes unitários das regras de negócio em ``app.services.tarefas``."""
+"""Testes unitários das regras de negócio em ``app.services.tarefas``.
+
+O ``TarefaRepository`` é substituído por um repositório falso em memória,
+então estes testes não precisam de banco de dados.
+"""
+
+from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 
-from app.schemas.tarefa import TarefaAtualizacaoParcial, TarefaEntrada
-from app.services.tarefas import (
-    TarefaNaoEncontradaError,
-    TarefaService,
-    get_tarefa_service,
-)
+from app.models.tarefa import TarefaModel
+from app.schemas.tarefa import Tarefa, TarefaAtualizacaoParcial, TarefaEntrada
+from app.services.tarefas import TarefaNaoEncontradaError, TarefaService
+
+
+class RepositorioFalso:
+    """Implementa a mesma interface do ``TarefaRepository`` em memória."""
+
+    def __init__(self) -> None:
+        self.tarefas: dict[int, TarefaModel] = {}
+        self.proximo_id = 1
+
+    def listar(
+        self, concluida: bool | None = None, limite: int = 100
+    ) -> list[TarefaModel]:
+        tarefas = list(self.tarefas.values())
+        if concluida is not None:
+            tarefas = [t for t in tarefas if t.concluida == concluida]
+        return tarefas[:limite]
+
+    def obter(self, tarefa_id: int) -> TarefaModel | None:
+        return self.tarefas.get(tarefa_id)
+
+    def criar(self, campos: dict[str, Any]) -> TarefaModel:
+        tarefa = TarefaModel(id=self.proximo_id, criada_em=datetime.now(UTC), **campos)
+        self.tarefas[tarefa.id] = tarefa
+        self.proximo_id += 1
+        return tarefa
+
+    def atualizar(self, tarefa: TarefaModel, campos: dict[str, Any]) -> TarefaModel:
+        for nome, valor in campos.items():
+            setattr(tarefa, nome, valor)
+        return tarefa
+
+    def remover(self, tarefa: TarefaModel) -> None:
+        del self.tarefas[tarefa.id]
 
 
 @pytest.fixture
-def servico() -> TarefaService:
-    """Fixture com um serviço vazio para cada teste."""
-    return TarefaService()
+def repositorio() -> RepositorioFalso:
+    """Repositório falso vazio para cada teste."""
+    return RepositorioFalso()
 
 
-def test_criar_gera_ids_sequenciais(servico: TarefaService) -> None:
-    """Cada tarefa criada recebe o próximo id."""
-    primeira = servico.criar(TarefaEntrada(titulo="A"))
-    segunda = servico.criar(TarefaEntrada(titulo="B"))
-    assert (primeira.id, segunda.id) == (1, 2)
-    assert primeira.concluida is False
+@pytest.fixture
+def servico(repositorio: RepositorioFalso) -> TarefaService:
+    """Serviço usando o repositório falso."""
+    return TarefaService(repositorio)
 
 
-def test_id_nao_e_reaproveitado_apos_remocao(servico: TarefaService) -> None:
-    """Remover uma tarefa não libera o id dela para a próxima."""
-    primeira = servico.criar(TarefaEntrada(titulo="A"))
-    servico.remover(primeira.id)
-    assert servico.criar(TarefaEntrada(titulo="B")).id == 2
+def test_criar_devolve_schema_e_nao_modelo_orm(servico: TarefaService) -> None:
+    """O serviço converte o modelo ORM no schema Pydantic ``Tarefa``."""
+    tarefa = servico.criar(TarefaEntrada(titulo="A"))
+    assert isinstance(tarefa, Tarefa)
+    assert (tarefa.id, tarefa.titulo, tarefa.concluida) == (1, "A", False)
+
+
+def test_criar_repassa_campos_ao_repositorio(
+    servico: TarefaService, repositorio: RepositorioFalso
+) -> None:
+    """Os dados validados chegam ao repositório."""
+    servico.criar(TarefaEntrada(titulo="A", descricao="x", concluida=True))
+    salvo = repositorio.tarefas[1]
+    assert (salvo.titulo, salvo.descricao, salvo.concluida) == ("A", "x", True)
 
 
 def test_obter(servico: TarefaService) -> None:
@@ -59,44 +103,38 @@ def test_substituir_e_atualizar_id_inexistente(servico: TarefaService) -> None:
         (True, 100, ["B"]),
         (False, 100, ["A", "C"]),
         (None, 2, ["A", "B"]),
-        (False, 1, ["A"]),
     ],
 )
-def test_listar_com_filtro_e_limite(
+def test_listar_repassa_filtro_e_limite(
     servico: TarefaService, concluida: bool | None, limite: int, esperado: list[str]
 ) -> None:
-    """``listar`` aplica o filtro por status e depois o limite."""
+    """``listar`` repassa filtro e limite e devolve schemas."""
     servico.criar(TarefaEntrada(titulo="A"))
     servico.criar(TarefaEntrada(titulo="B", concluida=True))
     servico.criar(TarefaEntrada(titulo="C"))
     tarefas = servico.listar(concluida=concluida, limite=limite)
     assert [t.titulo for t in tarefas] == esperado
+    assert all(isinstance(t, Tarefa) for t in tarefas)
 
 
 def test_substituir_redefine_campos_omitidos(servico: TarefaService) -> None:
-    """``substituir`` troca a tarefa inteira, mantendo apenas o id."""
+    """``substituir`` troca todos os campos editáveis, mantendo o id."""
     tarefa = servico.criar(TarefaEntrada(titulo="A", descricao="x", concluida=True))
     nova = servico.substituir(tarefa.id, TarefaEntrada(titulo="B"))
-    assert nova.model_dump() == {
-        "id": tarefa.id,
-        "titulo": "B",
-        "descricao": None,
-        "concluida": False,
-    }
-    assert servico.obter(tarefa.id) == nova
+    assert (nova.id, nova.titulo, nova.descricao, nova.concluida) == (
+        tarefa.id,
+        "B",
+        None,
+        False,
+    )
+    assert nova.criada_em == tarefa.criada_em
 
 
 def test_atualizar_altera_apenas_campos_enviados(servico: TarefaService) -> None:
     """``atualizar`` preserva os campos que não foram enviados."""
     tarefa = servico.criar(TarefaEntrada(titulo="A", descricao="x"))
     nova = servico.atualizar(tarefa.id, TarefaAtualizacaoParcial(concluida=True))
-    assert nova.model_dump() == {
-        "id": tarefa.id,
-        "titulo": "A",
-        "descricao": "x",
-        "concluida": True,
-    }
-    assert servico.obter(tarefa.id) == nova
+    assert nova == tarefa.model_copy(update={"concluida": True})
 
 
 def test_atualizar_permite_limpar_descricao(servico: TarefaService) -> None:
@@ -107,12 +145,7 @@ def test_atualizar_permite_limpar_descricao(servico: TarefaService) -> None:
 
 
 def test_remover(servico: TarefaService) -> None:
-    """``remover`` apaga a tarefa da listagem."""
+    """``remover`` apaga a tarefa do repositório."""
     tarefa = servico.criar(TarefaEntrada(titulo="A"))
     servico.remover(tarefa.id)
     assert servico.listar() == []
-
-
-def test_get_tarefa_service_retorna_instancia_unica() -> None:
-    """A dependência da aplicação devolve sempre o mesmo serviço."""
-    assert get_tarefa_service() is get_tarefa_service()

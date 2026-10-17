@@ -1,6 +1,8 @@
 # ============================================================================
 # Docker Compose do projeto C216
 # Serviços: backend (FastAPI) e banco de dados (PostgreSQL)
+# Credenciais vêm de variáveis de ambiente (arquivo .env na raiz, veja
+# .env.example); sem .env, os valores padrão abaixo são usados.
 # ============================================================================
 
 services:
@@ -11,26 +13,32 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://c216:c216@db:5432/c216
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-c216}:${POSTGRES_PASSWORD:-c216}@db:5432/${POSTGRES_DB:-c216}
       APP_ENV: development
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 5
     restart: unless-stopped
 
   db:
     image: postgres:16-alpine
     container_name: c216-db
     environment:
-      POSTGRES_USER: c216
-      POSTGRES_PASSWORD: c216
-      POSTGRES_DB: c216
+      POSTGRES_USER: ${POSTGRES_USER:-c216}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-c216}
+      POSTGRES_DB: ${POSTGRES_DB:-c216}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U c216 -d c216"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5

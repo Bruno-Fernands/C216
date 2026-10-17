@@ -1,7 +1,7 @@
 # ============================================================================
 # CI - Backend C216
-# Roda os testes unitários e de integração do backend (Pytest), em jobs
-# separados, e valida o build da imagem Docker.
+# Roda o lint (Ruff), os testes unitários e os de integração do backend
+# (Pytest, com PostgreSQL), em jobs separados, e valida o build Docker.
 # Executa em `push` e `pull_request`.
 # ============================================================================
 
@@ -12,6 +12,35 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    name: Lint (Ruff)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Setup do Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar e configurar o Poetry
+        run: |
+          pip install poetry==2.4.3
+          poetry config virtualenvs.in-project true
+
+      - name: Instalar dependências com Poetry
+        run: poetry install
+
+      - name: Verificar estilo e formatação
+        run: |
+          poetry run ruff check .
+          poetry run ruff format --check .
+
   unit-tests:
     name: Testes unitários (Pytest)
     runs-on: ubuntu-latest
@@ -45,6 +74,24 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://c216:c216@localhost:5432/c216_test
+
+    # PostgreSQL de verdade para os testes de integração
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: c216
+          POSTGRES_PASSWORD: c216
+          POSTGRES_DB: c216_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U c216 -d c216_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout do código

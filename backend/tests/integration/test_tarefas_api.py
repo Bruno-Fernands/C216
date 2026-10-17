@@ -20,7 +20,9 @@ def test_criar_tarefa(client: TestClient) -> None:
         "/tarefas", json={"titulo": "Estudar FastAPI", "descricao": "Prática 4"}
     )
     assert resposta.status_code == 201
-    assert resposta.json() == {
+    corpo = resposta.json()
+    assert corpo.pop("criada_em")
+    assert corpo == {
         "id": 1,
         "titulo": "Estudar FastAPI",
         "descricao": "Prática 4",
@@ -129,7 +131,7 @@ def test_substituir_tarefa(client: TestClient) -> None:
     resposta = client.put(f"/tarefas/{tarefa['id']}", json={"titulo": "Novo título"})
     assert resposta.status_code == 200
     assert resposta.json() == {
-        "id": tarefa["id"],
+        **tarefa,
         "titulo": "Novo título",
         "descricao": None,
         "concluida": False,
@@ -168,10 +170,11 @@ def test_atualizar_tarefa_inexistente_retorna_404(client: TestClient) -> None:
     assert resposta.status_code == 404
 
 
-def test_atualizar_tarefa_invalida_retorna_422(client: TestClient) -> None:
-    """PATCH com valor inválido deve retornar HTTP 422."""
+@pytest.mark.parametrize("corpo", [{"titulo": ""}, {"titulo": None}])
+def test_atualizar_tarefa_invalida_retorna_422(client: TestClient, corpo: dict) -> None:
+    """PATCH com valor inválido (inclusive ``null``) deve retornar HTTP 422."""
     tarefa = criar(client)
-    resposta = client.patch(f"/tarefas/{tarefa['id']}", json={"titulo": ""})
+    resposta = client.patch(f"/tarefas/{tarefa['id']}", json=corpo)
     assert resposta.status_code == 422
 
 
