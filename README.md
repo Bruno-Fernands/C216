@@ -8,10 +8,10 @@ Repositório das atividades práticas da disciplina **C216**, turma L1.
 | ---------------- | ----------------------------------------------------- |
 | `backend/`       | Backend em Python gerenciado com Poetry (FastAPI)     |
 | `Makefile`       | Automação de tarefas do projeto                       |
-| `docker-compose.yml` | Orquestração dos serviços (backend + banco)       |
-| `.github/workflows/ci-backend.yml` | CI: testes e build Docker                  |
-| `frontend/`      | Frontend React (Vite + Tailwind), sem chamadas ao backend |
-| `.github/workflows/ci-frontend.yml` | CI: Biome, Vitest, build e Playwright     |
+| `docker-compose.yml` | Orquestração dos serviços (`db`, `api` e `frontend`) |
+| `.github/workflows/ci-backend.yml` | CI: lint, testes e build das imagens Docker |
+| `frontend/`      | Frontend React (Vite + Tailwind) que consome a API `/items/` |
+| `.github/workflows/ci-frontend.yml` | CI: Biome, Vitest, build e E2E (Playwright + Compose) |
 
 ### Organização do backend
 
@@ -50,8 +50,10 @@ O service devolve schemas Pydantic; os modelos ORM não saem da camada de dados.
 | `PUT`    | `/tarefas/{tarefa_id}`  | Substitui a tarefa inteira                          |
 | `PATCH`  | `/tarefas/{tarefa_id}`  | Atualiza apenas os campos enviados                  |
 | `DELETE` | `/tarefas/{tarefa_id}`  | Remove a tarefa (`204`)                             |
+| `GET`    | `/items/`               | Lista os itens (usado pelo frontend)                |
+| `POST`   | `/items/`               | Cria um item (`201`); `409` se o nome já existir    |
 
-> As tarefas são persistidas no PostgreSQL (volume `pgdata`), então
+> As tarefas e os itens são persistidos no PostgreSQL (volume `pgdata`), então
 > continuam lá após reiniciar a API ou os containers.
 > A documentação interativa fica em `http://localhost:8000/docs`.
 
@@ -65,19 +67,25 @@ O service devolve schemas Pydantic; os modelos ORM não saem da camada de dados.
 | Prática 4      | Organização da API (routers/schemas/services) e CRUD de tarefas | ✅ Concluída |
 | Prática 5      | PostgreSQL com SQLAlchemy, Repository, Alembic e Ruff | ✅ Concluída |
 | Prática 6      | Frontend: gerenciador de itens (React, Tailwind, Biome, Vitest, Playwright) | ✅ Concluída |
+| Prática 7      | Integração frontend + API (fetch, CORS, frontend no Compose, E2E com persistência) | ✅ Concluída |
 
 ## Como executar
 
 ### Docker (recomendado)
 
 ```bash
-make build      # constrói as imagens
-make up         # sobe backend + PostgreSQL e espera ficarem saudáveis
+make up-build   # constrói as imagens e sobe db, api e frontend (espera ficarem healthy)
+make ps         # status dos serviços (todos devem estar "healthy")
+make db-upgrade # aplica as migrations dentro do container da api
+make db-current # mostra a revisão atual do banco, que deve terminar em "(head)"
 make logs       # acompanha os logs
 make down       # derruba os serviços (os dados ficam no volume pgdata)
 ```
 
-Ao iniciar, o container do backend roda `alembic upgrade head` antes do
+- Interface: `http://localhost:5173`
+- API e documentação: `http://localhost:8000/docs`
+
+Ao iniciar, o container da api roda `alembic upgrade head` antes do
 `uvicorn`, então o banco é criado/atualizado automaticamente.
 
 ### Local (sem Docker para a API)
@@ -89,7 +97,7 @@ make run        # sobe a API em http://localhost:8000
 make help       # lista todos os comandos disponíveis
 ```
 
-> O backend expõe a API na porta `8000` e o PostgreSQL na porta `5432`.
+> Portas padrão: frontend `5173`, API `8000` e PostgreSQL `5432` (variáveis `FRONTEND_PORT`, `API_PORT` e `DB_PORT`).
 
 ### Variáveis de ambiente
 
@@ -97,7 +105,10 @@ make help       # lista todos os comandos disponíveis
 | ------------------- | ---------------------------- | ------------------------------------------------------- |
 | `DATABASE_URL`      | API e Alembic                | `postgresql+psycopg://c216:c216@localhost:5432/c216`   |
 | `TEST_DATABASE_URL` | Testes de integração         | `postgresql+psycopg://c216:c216@localhost:5432/c216_test` |
+| `CORS_ORIGINS`      | API (CORS), separadas por vírgula | `http://localhost:5173`                         |
+| `VITE_API_URL`      | Build do frontend (URL da API) | `http://localhost:8000`                           |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | `docker-compose.yml` | `c216` / `c216` / `c216` |
+| `DB_PORT` / `API_PORT` / `FRONTEND_PORT` | `docker-compose.yml` (portas no host) | `5432` / `8000` / `5173` |
 
 Para trocar os valores, copie `.env.example` (raiz, usado pelo Compose) ou
 `backend/.env.example` (usado pela API fora do Docker) para `.env`.
@@ -119,7 +130,8 @@ A suíte de testes usa o **Pytest** e é separada por tipo:
 - **Testes de integração** (`backend/tests/integration/`): todos os endpoints
   via `TestClient` e o `TarefaRepository`, contra um **PostgreSQL real**
   (banco `c216_test`, criado automaticamente e montado com as migrations do
-  Alembic).
+  Alembic). Inclui os testes de CORS (preflight da origem permitida e
+  bloqueio de origem desconhecida).
 
 ```bash
 make test               # suíte completa (sobe o PostgreSQL do Compose)
@@ -131,32 +143,44 @@ make format             # Ruff: corrige e formata
 
 A **integração contínua** roda no GitHub Actions a cada `push` e
 `pull_request` (workflow `ci-backend.yml`), com jobs de lint, testes
-unitários, testes de integração (com um serviço PostgreSQL) e build da
-imagem Docker.
+unitários, testes de integração (com um serviço PostgreSQL) e build das
+imagens Docker (`api` e `frontend`).
 
 ## Frontend
 
 Gerenciador de itens (nome + descrição) em **React** com **Vite** e
-**Tailwind CSS**. O estado fica só em memória, sem chamadas ao backend.
+**Tailwind CSS**. Os itens são lidos e gravados na API (`GET`/`POST /items/`),
+com mensagens de carregamento e de erro (por exemplo, "Já existe um item com
+esse nome"). No Compose, o build é servido pelo **nginx** (`frontend/Dockerfile`).
 
 ```
 frontend/
 ├── src/
 │   ├── components/ItemForm.jsx   # formulário (nome + descrição)
 │   ├── components/ItemList.jsx   # listagem e estado vazio
-│   ├── App.jsx                   # guarda o estado dos itens
+│   ├── services/items.js         # listItems e createItem (fetch)
+│   ├── App.jsx                   # carrega/cria itens, carregamento e erros
 │   └── validation.js             # regras de validação (função pura)
 └── tests/
-    ├── unit/                     # Vitest: validação e componentes isolados
-    ├── integration/              # Vitest: formulário + lista no App
-    └── e2e/                      # Playwright (desktop e mobile)
+    ├── unit/                     # Vitest: validação, services (fetch mockado) e componentes
+    ├── integration/              # Vitest: App com fetch mockado (carregando, sucesso, erro)
+    └── e2e/                      # Playwright contra a stack real (persistência após reload)
 ```
 
 ```bash
 make front-install   # npm ci
-make front-dev       # http://localhost:5173
-make check-all       # npm ci, lint, format:check, test, build e test:e2e
+make front-dev       # Vite em http://localhost:5173 (com a API rodando)
+make frontend-check  # Biome: lint + formatação
+make frontend-test   # Vitest: unitários e integração
+make frontend-build  # build de produção
+make e2e             # Playwright contra db + api + frontend no projeto lab-e2e
+make check-all       # tudo: lint/testes do backend, frontend e E2E
 ```
+
+O `make e2e` sobe uma cópia isolada da stack (projeto `lab-e2e`, portas
+5174/8001/5433, banco novo), roda o Playwright e remove containers e volume
+no fim, **mesmo se algum teste falhar**. Por isso dá para rodar com a stack
+de desenvolvimento no ar.
 
 ## Como contribuir
 

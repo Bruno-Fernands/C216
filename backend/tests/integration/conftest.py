@@ -58,9 +58,9 @@ def engine() -> Iterator[Engine]:
 
 @pytest.fixture
 def session_factory(engine: Engine) -> sessionmaker[Session]:
-    """Fábrica de sessões com a tabela ``tarefas`` vazia e ids reiniciados."""
+    """Fábrica de sessões com ``tarefas`` e ``items`` vazias e ids reiniciados."""
     with engine.begin() as conexao:
-        conexao.execute(text("TRUNCATE TABLE tarefas RESTART IDENTITY"))
+        conexao.execute(text("TRUNCATE TABLE tarefas, items RESTART IDENTITY"))
     return sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 

@@ -5,14 +5,24 @@ do FastAPI e registra os routers definidos em ``app.routers``.
 """
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import operacoes, tarefas
+from app.core.config import get_settings
+from app.routers import items, operacoes, tarefas
 
 app = FastAPI(
     title="C216 API",
     description="Backend da disciplina C216 - Sistemas Distribuídos (L1)",
-    version="0.2.0",
+    version="0.3.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_settings().cors_origins_lista,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Content-Type"],
 )
 
 app.include_router(operacoes.router)
 app.include_router(tarefas.router)
+app.include_router(items.router)

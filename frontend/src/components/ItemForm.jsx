@@ -8,16 +8,22 @@ export default function ItemForm({ onAdicionar }) {
   const [nome, setNome] = useState("");
   const [descricao, setDescricao] = useState("");
   const [erros, setErros] = useState({});
+  const [enviando, setEnviando] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const novosErros = validarItem({ nome, descricao });
     setErros(novosErros);
     if (Object.keys(novosErros).length > 0) return;
 
-    onAdicionar({ nome: nome.trim(), descricao: descricao.trim() });
-    setNome("");
-    setDescricao("");
+    setEnviando(true);
+    const salvou = await onAdicionar({ nome: nome.trim(), descricao: descricao.trim() });
+    setEnviando(false);
+    // Se a API recusar (ex.: nome repetido), mantém o que o usuário digitou.
+    if (salvou) {
+      setNome("");
+      setDescricao("");
+    }
   }
 
   return (
@@ -68,9 +74,10 @@ export default function ItemForm({ onAdicionar }) {
 
       <button
         type="submit"
-        className="w-full rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none sm:w-auto"
+        disabled={enviando}
+        className="w-full rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
       >
-        Adicionar
+        {enviando ? "Salvando..." : "Adicionar"}
       </button>
     </form>
   );

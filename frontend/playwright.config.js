@@ -1,16 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// O E2E roda contra a stack completa (db + api + frontend). `make e2e` sobe
+// uma cópia isolada (projeto lab-e2e) e passa a URL em E2E_BASE_URL.
 export default defineConfig({
   testDir: "./tests/e2e",
-  use: { baseURL: "http://localhost:4173" },
+  retries: process.env.CI ? 1 : 0,
+  use: { baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173" },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
     { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
-  // Testa o build de produção, igual ao que seria publicado.
-  webServer: {
-    command: "npm run build && npm run preview -- --port 4173 --strictPort",
-    url: "http://localhost:4173",
-    reuseExistingServer: !process.env.CI,
-  },
 });

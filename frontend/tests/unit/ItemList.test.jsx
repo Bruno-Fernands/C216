@@ -1,25 +1,23 @@
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import ItemList from "../../src/components/ItemList.jsx";
 
 describe("ItemList", () => {
   it("mostra o estado vazio", () => {
-    render(<ItemList itens={[]} onRemover={() => {}} />);
+    render(<ItemList itens={[]} />);
     expect(screen.getByText("Nenhum item cadastrado.")).toBeInTheDocument();
     expect(screen.queryByRole("list")).not.toBeInTheDocument();
   });
 
-  it("lista os itens e chama onRemover com o id", async () => {
-    const onRemover = vi.fn();
+  it("lista nome e descrição de cada item", () => {
     const itens = [
-      { id: "1", nome: "Lápis", descricao: "HB" },
-      { id: "2", nome: "Borracha", descricao: "Branca" },
+      { id: 1, nome: "Lápis", descricao: "HB" },
+      { id: 2, nome: "Borracha", descricao: "Branca" },
     ];
-    render(<ItemList itens={itens} onRemover={onRemover} />);
+    render(<ItemList itens={itens} />);
 
     expect(screen.getAllByRole("listitem")).toHaveLength(2);
-    await userEvent.click(screen.getByRole("button", { name: "Remover Borracha" }));
-    expect(onRemover).toHaveBeenCalledWith("2");
+    expect(screen.getByText("Borracha")).toBeInTheDocument();
+    expect(screen.getByText("Branca")).toBeInTheDocument();
   });
 });

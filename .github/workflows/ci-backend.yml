@@ -114,12 +114,12 @@ jobs:
         run: poetry run pytest tests/integration -v
 
   build-image:
-    name: Build da imagem Docker
+    name: Build das imagens Docker
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Build da imagem do backend
-        run: docker compose build backend
+      - name: Build das imagens (api e frontend)
+        run: docker compose build api frontend

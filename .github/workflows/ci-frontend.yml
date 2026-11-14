@@ -1,7 +1,8 @@
 # ============================================================================
 # CI - Frontend C216
 # Lint/formatação (Biome), testes unitários e de integração (Vitest),
-# build (Vite) e testes E2E (Playwright). Executa em `push` e `pull_request`.
+# build (Vite) e testes E2E (Playwright) contra a stack completa do Compose
+# (db + api + frontend, projeto lab-e2e). Executa em `push` e `pull_request`.
 # ============================================================================
 
 name: CI - Frontend
@@ -45,7 +46,7 @@ jobs:
         run: npm run build
 
   e2e:
-    name: Testes E2E (Playwright)
+    name: Testes E2E (Playwright + Compose)
     runs-on: ubuntu-latest
     needs: qualidade
     steps:
@@ -65,8 +66,14 @@ jobs:
       - name: Instalar o navegador do Playwright
         run: npx playwright install --with-deps chromium
 
-      - name: Testes E2E
-        run: npm run test:e2e
+      - name: Testes E2E contra db + api + frontend (make e2e)
+        working-directory: .
+        run: make e2e
+
+      - name: Garantir que nenhum container lab-e2e ficou ativo
+        if: ${{ always() }}
+        working-directory: .
+        run: test -z "$(docker ps -aq --filter label=com.docker.compose.project=lab-e2e)"
 
       - name: Publicar relatório do Playwright
         if: ${{ !cancelled() }}
