@@ -14,11 +14,12 @@ APP_MODULE   := app.main:app
 HOST         := 0.0.0.0
 PORT         := 8000
 COMPOSE      := docker compose
+FRONTEND     := frontend
 
 # ----------------------------------------------------------------------------
 # Alvos seguidos de '##' aparecem listados no `make help`
 # ----------------------------------------------------------------------------
-.PHONY: help install run build up down logs ps shell clean test
+.PHONY: help install run build up down logs ps shell clean test front-install front-dev check-all
 
 help: ## Lista todos os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -50,7 +51,17 @@ shell: ## Abre um shell dentro do container do backend
 test: ## Executa a suíte de testes com Pytest
 	cd $(BACKEND) && $(POETRY) run pytest -v
 
+front-install: ## Instala as dependências do frontend (npm ci)
+	cd $(FRONTEND) && npm ci
+
+front-dev: ## Sobe o frontend em modo desenvolvimento (Vite)
+	cd $(FRONTEND) && npm run dev
+
+check-all: ## Checklist do frontend: install, lint, formato, testes, build e E2E
+	cd $(FRONTEND) && npm ci && npm run lint && npm run format:check && npm run test && npm run build && npm run test:e2e
+
 clean: ## Remove containers, volumes e artefatos locais
 	$(COMPOSE) down -v
 	rm -rf $(BACKEND)/.venv
 	find . -type d -name '__pycache__' -exec rm -rf {} +
+	rm -rf $(FRONTEND)/node_modules $(FRONTEND)/dist
