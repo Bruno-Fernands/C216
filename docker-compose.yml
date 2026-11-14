@@ -1,38 +1,65 @@
 # ============================================================================
 # Docker Compose do projeto C216
-# Serviços: backend (FastAPI) e banco de dados (PostgreSQL)
+# Serviços: db (PostgreSQL), api (FastAPI) e frontend (React servido pelo nginx)
+# Credenciais e portas vêm de variáveis de ambiente (arquivo .env na raiz,
+# veja .env.example); sem .env, os valores padrão abaixo são usados.
+# As portas são variáveis para o `make e2e` subir uma segunda cópia da
+# stack (projeto lab-e2e) sem conflitar com a de desenvolvimento.
 # ============================================================================
 
 services:
-  backend:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-c216}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-c216}
+      POSTGRES_DB: ${POSTGRES_DB:-c216}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
     build:
       context: ./backend
-    container_name: c216-backend
     ports:
-      - "8000:8000"
+      - "${API_PORT:-8000}:8000"
     environment:
-      DATABASE_URL: postgresql://c216:c216@db:5432/c216
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-c216}:${POSTGRES_PASSWORD:-c216}@db:5432/${POSTGRES_DB:-c216}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:${FRONTEND_PORT:-5173}}
       APP_ENV: development
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 5
     restart: unless-stopped
 
-  db:
-    image: postgres:16-alpine
-    container_name: c216-db
-    environment:
-      POSTGRES_USER: c216
-      POSTGRES_PASSWORD: c216
-      POSTGRES_DB: c216
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # O navegador chama a API direto, então a URL é a vista pelo host.
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:${API_PORT:-8000}}
     ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      api:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U c216 -d c216"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
       retries: 5
     restart: unless-stopped
 

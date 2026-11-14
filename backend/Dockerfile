@@ -26,11 +26,13 @@ COPY pyproject.toml poetry.lock ./
 # Instala apenas as dependências de produção
 RUN poetry install --no-root --only main --no-interaction
 
-# Copia o código da aplicação
+# Copia o código da aplicação e as migrations do Alembic
+COPY alembic.ini ./
+COPY alembic ./alembic
 COPY app ./app
 
 # Porta exposta pela API
 EXPOSE 8000
 
-# Comando padrão: sobe o servidor uvicorn
-CMD ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Comando padrão: aplica as migrations pendentes e sobe o servidor uvicorn
+CMD ["sh", "-c", "poetry run alembic upgrade head && exec poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000"]

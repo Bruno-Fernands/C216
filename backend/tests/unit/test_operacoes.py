@@ -1,8 +1,8 @@
-"""Testes unitários das funções de negócio em ``app.services``."""
+"""Testes unitários das funções de negócio em ``app.services.operacoes``."""
 
 import pytest
 
-from app.services import dividir, saudacao, somar
+from app.services.operacoes import dividir, saudacao, somar
 
 
 @pytest.fixture
