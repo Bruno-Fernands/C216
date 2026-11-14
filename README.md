@@ -10,6 +10,8 @@ Repositório das atividades práticas da disciplina **C216**, turma L1.
 | `Makefile`       | Automação de tarefas do projeto                       |
 | `docker-compose.yml` | Orquestração dos serviços (backend + banco)       |
 | `.github/workflows/ci-backend.yml` | CI: testes e build Docker                  |
+| `frontend/`      | Frontend React (Vite + Tailwind), sem chamadas ao backend |
+| `.github/workflows/ci-frontend.yml` | CI: Biome, Vitest, build e Playwright     |
 
 ### Organização do backend
 
@@ -62,6 +64,7 @@ O service devolve schemas Pydantic; os modelos ORM não saem da camada de dados.
 | Prática 3      | Testes com Pytest e CI com GitHub Actions          | ✅ Concluída |
 | Prática 4      | Organização da API (routers/schemas/services) e CRUD de tarefas | ✅ Concluída |
 | Prática 5      | PostgreSQL com SQLAlchemy, Repository, Alembic e Ruff | ✅ Concluída |
+| Prática 6      | Frontend: gerenciador de itens (React, Tailwind, Biome, Vitest, Playwright) | ✅ Concluída |
 
 ## Como executar
 
@@ -130,6 +133,30 @@ A **integração contínua** roda no GitHub Actions a cada `push` e
 `pull_request` (workflow `ci-backend.yml`), com jobs de lint, testes
 unitários, testes de integração (com um serviço PostgreSQL) e build da
 imagem Docker.
+
+## Frontend
+
+Gerenciador de itens (nome + descrição) em **React** com **Vite** e
+**Tailwind CSS**. O estado fica só em memória, sem chamadas ao backend.
+
+```
+frontend/
+├── src/
+│   ├── components/ItemForm.jsx   # formulário (nome + descrição)
+│   ├── components/ItemList.jsx   # listagem e estado vazio
+│   ├── App.jsx                   # guarda o estado dos itens
+│   └── validation.js             # regras de validação (função pura)
+└── tests/
+    ├── unit/                     # Vitest: validação e componentes isolados
+    ├── integration/              # Vitest: formulário + lista no App
+    └── e2e/                      # Playwright (desktop e mobile)
+```
+
+```bash
+make front-install   # npm ci
+make front-dev       # http://localhost:5173
+make check-all       # npm ci, lint, format:check, test, build e test:e2e
+```
 
 ## Como contribuir
 
