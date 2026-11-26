@@ -4,7 +4,6 @@ Importar os modelos aqui garante que todos sejam registrados em
 ``Base.metadata`` (usado pelo Alembic no ``--autogenerate``).
 """
 
-from app.models.item import ItemModel
-from app.models.tarefa import TarefaModel
+from app.models.produto import MovimentacaoModel, ProdutoModel
 
-__all__ = ["ItemModel", "TarefaModel"]
+__all__ = ["MovimentacaoModel", "ProdutoModel"]

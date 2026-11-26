@@ -1,28 +1,32 @@
-"""Ponto de entrada da API FastAPI do projeto C216.
+"""Ponto de entrada da API do Controle de Estoque.
 
 Responsável apenas pela inicialização da aplicação: cria a instância
-do FastAPI e registra os routers definidos em ``app.routers``.
+do FastAPI, configura o CORS e registra os routers de ``app.routers``.
 """
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.routers import items, operacoes, tarefas
+from app.routers import produtos
 
 app = FastAPI(
-    title="C216 API",
-    description="Backend da disciplina C216 - Sistemas Distribuídos (L1)",
-    version="0.3.0",
+    title="Controle de Estoque API",
+    description="Projeto Final de C216 - Sistemas Distribuídos (L1)",
+    version="1.0.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_settings().cors_origins_lista,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Content-Type"],
 )
 
-app.include_router(operacoes.router)
-app.include_router(tarefas.router)
-app.include_router(items.router)
+app.include_router(produtos.router)
+
+
+@app.get("/", tags=["status"])
+def raiz() -> dict:
+    """Verificação de saúde (usada pelo healthcheck do Compose)."""
+    return {"message": "Controle de Estoque API", "status": "ok"}
