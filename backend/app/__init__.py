@@ -1,0 +1,1 @@
+"""Pacote principal do backend da disciplina C216 - Sistemas Distribuídos (L1)."""
