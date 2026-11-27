@@ -1,40 +1,47 @@
 import { describe, expect, it } from "vitest";
-import { DESCRICAO_MAX, NOME_MAX, NOME_MIN, validarItem } from "../../src/validation.js";
+import { paraApi, validarMovimentacao, validarProduto } from "../../src/validation.js";
 
-describe("validarItem", () => {
-  it("aceita um item válido", () => {
-    expect(validarItem({ nome: "Caderno", descricao: "Capa azul" })).toEqual({});
+const VALIDO = { nome: "Caneta", descricao: "", preco: "2,50", estoque_minimo: "5" };
+
+describe("validarProduto", () => {
+  it("aceita um produto válido", () => {
+    expect(validarProduto(VALIDO)).toEqual({});
   });
 
-  it("exige nome e descrição", () => {
-    const erros = validarItem({ nome: "", descricao: "" });
-    expect(erros.nome).toMatch(/obrigatório/);
-    expect(erros.descricao).toMatch(/obrigatória/);
+  it.each([
+    [{ nome: "" }, "nome", "obrigatório"],
+    [{ nome: " a " }, "nome", "pelo menos 2"],
+    [{ nome: "x".repeat(81) }, "nome", "no máximo 80"],
+    [{ descricao: "x".repeat(301) }, "descricao", "no máximo 300"],
+    [{ preco: "" }, "preco", "preço válido"],
+    [{ preco: "-1" }, "preco", "preço válido"],
+    [{ preco: "1,999" }, "preco", "preço válido"],
+    [{ estoque_minimo: "1.5" }, "estoque_minimo", "inteiro"],
+    [{ estoque_minimo: "" }, "estoque_minimo", "inteiro"],
+  ])("recusa %o", (alteracao, campo, mensagem) => {
+    expect(validarProduto({ ...VALIDO, ...alteracao })[campo]).toContain(mensagem);
   });
 
-  it("trata texto só com espaços como vazio", () => {
-    expect(validarItem({ nome: "   ", descricao: "  " })).toHaveProperty("nome");
+  it("aceita preço com ponto ou vírgula", () => {
+    expect(validarProduto({ ...VALIDO, preco: "10.5" })).toEqual({});
+    expect(validarProduto({ ...VALIDO, preco: "10" })).toEqual({});
+  });
+});
+
+describe("validarMovimentacao", () => {
+  it.each(["", "0", "-2", "1.5", "abc"])("recusa quantidade %s", (quantidade) => {
+    expect(validarMovimentacao({ quantidade }).quantidade).toBeDefined();
   });
 
-  it("valida os limites do nome", () => {
-    expect(validarItem({ nome: "a".repeat(NOME_MIN - 1), descricao: "x" }).nome).toMatch(
-      /pelo menos/,
-    );
-    expect(validarItem({ nome: "a".repeat(NOME_MIN), descricao: "x" })).toEqual({});
-    expect(validarItem({ nome: "a".repeat(NOME_MAX), descricao: "x" })).toEqual({});
-    expect(validarItem({ nome: "a".repeat(NOME_MAX + 1), descricao: "x" }).nome).toMatch(
-      /no máximo/,
-    );
+  it("aceita inteiro positivo", () => {
+    expect(validarMovimentacao({ quantidade: "3" })).toEqual({});
   });
+});
 
-  it("valida o limite da descrição", () => {
-    expect(validarItem({ nome: "Item", descricao: "d".repeat(DESCRICAO_MAX) })).toEqual({});
+describe("paraApi", () => {
+  it("converte os campos do formulário para o JSON da API", () => {
     expect(
-      validarItem({ nome: "Item", descricao: "d".repeat(DESCRICAO_MAX + 1) }).descricao,
-    ).toMatch(/no máximo/);
-  });
-
-  it("não quebra quando os campos faltam", () => {
-    expect(Object.keys(validarItem({}))).toEqual(["nome", "descricao"]);
+      paraApi({ nome: " Caneta ", descricao: "  ", preco: "2,50", estoque_minimo: "5" }),
+    ).toEqual({ nome: "Caneta", descricao: null, preco: "2.50", estoque_minimo: 5 });
   });
 });
