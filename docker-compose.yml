@@ -4,7 +4,7 @@
 # Credenciais e portas vêm de variáveis de ambiente (arquivo .env na raiz,
 # veja .env.example); sem .env, os valores padrão abaixo são usados.
 # As portas são variáveis para o `make e2e` subir uma segunda cópia da
-# stack (projeto lab-e2e) sem conflitar com a de desenvolvimento.
+# stack (projeto estoque-e2e) sem conflitar com a de desenvolvimento.
 # ============================================================================
 
 services:

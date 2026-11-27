@@ -2,7 +2,7 @@
 # CI - Frontend C216
 # Lint/formatação (Biome), testes unitários e de integração (Vitest),
 # build (Vite) e testes E2E (Playwright) contra a stack completa do Compose
-# (db + api + frontend, projeto lab-e2e). Executa em `push` e `pull_request`.
+# (db + api + frontend, projeto estoque-e2e). Executa em `push` e `pull_request`.
 # ============================================================================
 
 name: CI - Frontend
@@ -70,10 +70,10 @@ jobs:
         working-directory: .
         run: make e2e
 
-      - name: Garantir que nenhum container lab-e2e ficou ativo
+      - name: Garantir que nenhum container estoque-e2e ficou ativo
         if: ${{ always() }}
         working-directory: .
-        run: test -z "$(docker ps -aq --filter label=com.docker.compose.project=lab-e2e)"
+        run: test -z "$(docker ps -aq --filter label=com.docker.compose.project=estoque-e2e)"
 
       - name: Publicar relatório do Playwright
         if: ${{ !cancelled() }}

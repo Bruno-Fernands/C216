@@ -21,7 +21,7 @@ COMPOSE      := docker compose
 E2E_FRONT    := http://localhost:5174
 E2E_COMPOSE  := DB_PORT=5433 API_PORT=8001 FRONTEND_PORT=5174 \
                 CORS_ORIGINS=$(E2E_FRONT) VITE_API_URL=http://localhost:8001 \
-                $(COMPOSE) -p lab-e2e -f $(CURDIR)/docker-compose.yml
+                $(COMPOSE) -p estoque-e2e -f $(CURDIR)/docker-compose.yml
 
 # ----------------------------------------------------------------------------
 # Alvos seguidos de '##' aparecem listados no `make help`
@@ -109,7 +109,7 @@ frontend-check: ## Lint e formatação do frontend (Biome)
 frontend-build: ## Build de produção do frontend (Vite)
 	cd $(FRONTEND) && npm run build
 
-e2e: ## E2E (Playwright) contra a stack completa no projeto lab-e2e, removido no fim
+e2e: ## E2E (Playwright) contra a stack completa no projeto estoque-e2e, removido no fim
 	@trap '$(E2E_COMPOSE) down -v --remove-orphans' EXIT INT TERM; \
 	$(E2E_COMPOSE) up -d --build --wait && \
 	cd $(FRONTEND) && E2E_BASE_URL=$(E2E_FRONT) npx playwright test
